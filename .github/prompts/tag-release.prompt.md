@@ -17,7 +17,8 @@ tools: [vscode, execute, read, agent, search, todo]
 ## 4. 监听 CI
 所有 `gh` 命令必须指定 `--repo hikyuu/Auto_Bangumi`（本仓库是 fork，gh 默认指向上游 `EstrellaXD/Auto_Bangumi`，不指定会查不到 run）。
 等待 5 秒后用 `gh run list --repo hikyuu/Auto_Bangumi` 获取最新 run ID，然后用 `gh run watch --repo hikyuu/Auto_Bangumi` 实时监听直到完成。
-⚠️ `gh run watch` 会一直阻塞到 CI 完成，必须使用 **异步模式**（`mode: async`，不设 timeout 或设长 timeout）运行，不要用同步模式。
+⚠️ `gh run watch` 会一直阻塞到 CI 完成，必须使用 **异步模式**（`mode: async`，不设 timeout）运行。
+⚠️ `gh run watch` 启动后等**系统自动通知** completion 即可，不需要轮询。
 
 ## 5. 部署到路由器
 CI 通过后 SSH 到路由器拉取新镜像并重启：
