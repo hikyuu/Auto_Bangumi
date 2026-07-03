@@ -120,17 +120,13 @@ class RSSEngine(Database):
         if filter_str not in self._filter_cache:
             raw_pattern = filter_str.replace(",", "|")
             try:
-                self._filter_cache[filter_str] = re.compile(
-                    raw_pattern, re.IGNORECASE
-                )
+                self._filter_cache[filter_str] = re.compile(raw_pattern, re.IGNORECASE)
             except re.error:
                 # Filter contains invalid regex chars (e.g. unmatched '[')
                 # Fall back to escaping each term for literal matching
                 terms = filter_str.split(",")
                 escaped = "|".join(re.escape(t) for t in terms)
-                self._filter_cache[filter_str] = re.compile(
-                    escaped, re.IGNORECASE
-                )
+                self._filter_cache[filter_str] = re.compile(escaped, re.IGNORECASE)
                 logger.warning(
                     f"[Engine] Filter '{filter_str}' contains invalid regex, "
                     f"using literal matching"
@@ -141,6 +137,7 @@ class RSSEngine(Database):
         matched: Bangumi = self.bangumi.match_torrent(torrent.name)
         if matched:
             if matched.filter == "":
+                torrent.bangumi_id = matched.id
                 return matched
             pattern = self._get_filter_pattern(matched.filter)
             if not pattern.search(torrent.name):
@@ -215,6 +212,7 @@ class RSSEngine(Database):
         if not owning_bangumi or owning_bangumi.deleted:
             return None
         if owning_bangumi.filter == "":
+            torrent.bangumi_id = owning_bangumi.id
             return owning_bangumi
         pattern = self._get_filter_pattern(owning_bangumi.filter)
         if not pattern.search(torrent.name):
@@ -230,6 +228,8 @@ class RSSEngine(Database):
             if torrents:
                 async with DownloadClient() as client:
                     await client.add_torrent(torrents, bangumi)
+                    for t in torrents:
+                        t.bangumi_id = bangumi.id
                     self.torrent.add_all(torrents)
                     return ResponseModel(
                         status=True,
