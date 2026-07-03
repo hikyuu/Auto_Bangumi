@@ -13,17 +13,28 @@ logger = logging.getLogger(__name__)
 
 class TorrentManager(Database):
     @staticmethod
-    async def __match_torrents_list(data: Bangumi | BangumiUpdate) -> list:
-        async with DownloadClient() as client:
+    def _normalize_path(path: str) -> str:
+        """Normalize path separators for cross-platform comparison."""
+        return path.replace("\\", "/").rstrip("/")
+
+    @staticmethod
+    async def __match_torrents_list(
+        data: Bangumi | BangumiUpdate, client: DownloadClient | None = None
+    ) -> list:
+        if client is None:
+            async with DownloadClient() as cl:
+                torrents = await cl.get_torrent_info(status_filter=None)
+        else:
             torrents = await client.get_torrent_info(status_filter=None)
+        db_path = TorrentManager._normalize_path(data.save_path)
         return [
             torrent.get("hash", torrent.get("infohash_v1", ""))
             for torrent in torrents
-            if torrent.get("save_path") == data.save_path
+            if TorrentManager._normalize_path(torrent.get("save_path", "")) == db_path
         ]
 
     async def delete_torrents(self, data: Bangumi, client: DownloadClient):
-        hash_list = await self.__match_torrents_list(data)
+        hash_list = await self.__match_torrents_list(data, client)
         if hash_list:
             if not await client.delete_torrent(hash_list):
                 return ResponseModel(
