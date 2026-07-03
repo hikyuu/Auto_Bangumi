@@ -261,6 +261,12 @@ class QbDownloader:
                 delay = 0.1 * (2**attempt)
                 await asyncio.sleep(delay)
                 files = await self.torrents_files(torrent_hash)
+                if files is None:
+                    logger.warning(
+                        "[Downloader] Failed to verify rename: could not fetch file list"
+                    )
+                    continue  # Retry on next attempt
+                found_old = False
                 for f in files:
                     if f.get("name") == new_path:
                         return True

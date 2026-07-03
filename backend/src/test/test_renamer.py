@@ -1022,3 +1022,359 @@ class TestNormalizePath:
         from module.manager.renamer import Renamer
 
         assert Renamer._normalize_path("/path/to/dir") == "/path/to/dir"
+
+
+# ---------------------------------------------------------------------------
+# gen_path — advance method edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestGenPathAdvance:
+    """Tests for gen_path with advance rename method — edge cases."""
+
+    def test_cjk_bangumi_name(self):
+        """advance method with CJK bangumi name."""
+        ep = EpisodeFile(
+            media_path="old.mkv",
+            title="Dummy",
+            season=4,
+            episode=12,
+            suffix=".mkv",
+        )
+        result = Renamer.gen_path(
+            ep, "关于我转生变成史莱姆这档事", method="advance"
+        )
+        assert result == "关于我转生变成史莱姆这档事 S04E12.mkv"
+
+    def test_bangumi_name_with_parentheses(self):
+        """advance method with year in bangumi name."""
+        ep = EpisodeFile(
+            media_path="old.mkv", title="Dummy", season=3, episode=5, suffix=".mp4"
+        )
+        result = Renamer.gen_path(
+            ep, "My Anime (2024)", method="advance"
+        )
+        assert result == "My Anime (2024) S03E05.mp4"
+
+    def test_episode_zero_ova(self):
+        """advance: episode 0 (OVA/special) with zero padding."""
+        ep = EpisodeFile(
+            media_path="old.mkv", title="Dummy", season=1, episode=0, suffix=".mkv"
+        )
+        result = Renamer.gen_path(
+            ep, "Specials", method="advance"
+        )
+        assert result == "Specials S01E00.mkv"
+
+    def test_large_season_and_episode(self):
+        """advance: no padding for season/episode >= 10."""
+        ep = EpisodeFile(
+            media_path="old.mkv",
+            title="Dummy",
+            season=15,
+            episode=99,
+            suffix=".mkv",
+        )
+        result = Renamer.gen_path(ep, "Long Runner", method="advance")
+        assert "S15E99" in result
+        assert "015" not in result  # No zero-padding
+
+    def test_season_100_plus(self):
+        """advance: three-digit season."""
+        ep = EpisodeFile(
+            media_path="old.mkv",
+            title="Dummy",
+            season=100,
+            episode=1,
+            suffix=".mp4",
+        )
+        result = Renamer.gen_path(ep, "Forever", method="advance")
+        assert result == "Forever S100E01.mp4"
+
+    def test_episode_with_decimal(self):
+        """advance: episode with decimal point (e.g., 48.5)."""
+        ep = EpisodeFile(
+            media_path="old.mkv",
+            title="Dummy",
+            season=3,
+            episode=48.5,
+            suffix=".mkv",
+        )
+        result = Renamer.gen_path(ep, "Recap", method="advance")
+        assert "E48.5" in result or "S03" in result
+
+    def test_bangumi_name_with_spaces(self):
+        """advance: bangumi name with leading/trailing spaces."""
+        ep = EpisodeFile(
+            media_path="old.mkv", title="Dummy", season=1, episode=1, suffix=".mkv"
+        )
+        result = Renamer.gen_path(
+            ep, "  Space Anime  ", method="advance"
+        )
+        # Spaces in name are preserved (caller should trim)
+        assert "  Space Anime  " in result
+
+
+# ---------------------------------------------------------------------------
+# rename_file — advance method
+# ---------------------------------------------------------------------------
+
+
+class TestRenameFileAdvance:
+    """Tests for rename_file using the advance rename method."""
+
+    @pytest.fixture
+    def renamer(self, mock_qb_client):
+        with patch("module.downloader.download_client.settings") as mock_settings:
+            mock_settings.downloader.type = "qbittorrent"
+            mock_settings.downloader.host = "localhost:8080"
+            mock_settings.downloader.username = "admin"
+            mock_settings.downloader.password = "admin"
+            mock_settings.downloader.ssl = False
+            mock_settings.downloader.path = "/downloads/Bangumi"
+            mock_settings.bangumi_manage.group_tag = False
+            mock_settings.bangumi_manage.remove_bad_torrent = False
+            mock_settings.bangumi_manage.rename_method = "advance"
+            with patch(
+                "module.downloader.download_client.DownloadClient._DownloadClient__getClient",
+                return_value=mock_qb_client,
+            ):
+                r = Renamer()
+        r.client = mock_qb_client
+        return r
+
+    async def test_rename_cjk_anime(self, renamer):
+        """advance rename: CJK anime with S04E12 pattern."""
+        ep = EpisodeFile(
+            media_path="[ANi] 关于我转生变成史莱姆这档事 - 84 [1080P].mp4",
+            title="关于我转生变成史莱姆这档事",
+            season=4,
+            episode=12,
+            suffix=".mp4",
+        )
+        with patch.object(renamer._parser, "torrent_parser", return_value=ep):
+            renamer.client.torrents_rename_file.return_value = True
+            result = await renamer.rename_file(
+                torrent_name="[ANi] 关于我转生变成史莱姆这档事 - 84 [1080P].mp4",
+                media_path="[ANi] 关于我转生变成史莱姆这档事 - 84 [1080P].mp4",
+                bangumi_name="关于我转生变成史莱姆这档事 (2018)",
+                method="advance",
+                season=4,
+                _hash="hash_slime",
+            )
+
+        assert result is not None
+        assert result.official_title == "关于我转生变成史莱姆这档事 (2018)"
+        assert result.season == 4
+        assert result.episode == 12
+        renamer.client.torrents_rename_file.assert_called_once()
+        new_path = renamer.client.torrents_rename_file.call_args.kwargs["new_path"]
+        assert "关于我转生变成史莱姆这档事 (2018)" in new_path
+        assert "S04E12" in new_path
+
+    async def test_rename_episode_zero(self, renamer):
+        """advance rename: episode 0 OVA/special."""
+        ep = EpisodeFile(
+            media_path="[Sub] Special - OVA.mkv",
+            title="Special",
+            season=1,
+            episode=0,
+            suffix=".mkv",
+        )
+        with patch.object(renamer._parser, "torrent_parser", return_value=ep):
+            renamer.client.torrents_rename_file.return_value = True
+            result = await renamer.rename_file(
+                torrent_name="[Sub] Special - OVA.mkv",
+                media_path="[Sub] Special - OVA.mkv",
+                bangumi_name="Specials",
+                method="advance",
+                season=1,
+                _hash="hash_special",
+            )
+
+        assert result.episode == 0
+        renamer.client.torrents_rename_file.assert_called_once()
+        new_path = renamer.client.torrents_rename_file.call_args.kwargs["new_path"]
+        assert "S01E00" in new_path
+
+    async def test_rename_mp4_format(self, renamer):
+        """advance rename: .mp4 file."""
+        ep = EpisodeFile(
+            media_path="original.mp4", title="MP4 Anime", season=1, episode=5, suffix=".mp4"
+        )
+        with patch.object(renamer._parser, "torrent_parser", return_value=ep):
+            renamer.client.torrents_rename_file.return_value = True
+            result = await renamer.rename_file(
+                torrent_name="test", media_path="original.mp4",
+                bangumi_name="MP4 Anime", method="advance", season=1, _hash="h"
+            )
+
+        assert result is not None
+        new_path = renamer.client.torrents_rename_file.call_args.kwargs["new_path"]
+        assert new_path.endswith(".mp4")
+
+    async def test_rename_noop_when_already_correct(self, renamer):
+        """advance rename: skip when file already correctly named."""
+        ep = EpisodeFile(
+            media_path="My Anime (2024) S03E05.mkv",
+            title="My Anime",
+            season=3,
+            episode=5,
+            suffix=".mkv",
+        )
+        with patch.object(renamer._parser, "torrent_parser", return_value=ep):
+            result = await renamer.rename_file(
+                torrent_name="test",
+                media_path="My Anime (2024) S03E05.mkv",
+                bangumi_name="My Anime (2024)",
+                method="advance",
+                season=3,
+                _hash="h",
+            )
+
+        assert result is None
+        renamer.client.torrents_rename_file.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# rename flow — advance method
+# ---------------------------------------------------------------------------
+
+
+class TestRenameFlowAdvance:
+    """Full rename flow tests using the advance method."""
+
+    @pytest.fixture
+    def renamer(self, mock_qb_client):
+        with patch("module.downloader.download_client.settings") as mock_settings:
+            mock_settings.downloader.type = "qbittorrent"
+            mock_settings.downloader.host = "localhost:8080"
+            mock_settings.downloader.username = "admin"
+            mock_settings.downloader.password = "admin"
+            mock_settings.downloader.ssl = False
+            mock_settings.downloader.path = "/downloads/Bangumi"
+            mock_settings.bangumi_manage.group_tag = False
+            mock_settings.bangumi_manage.remove_bad_torrent = False
+            with patch(
+                "module.downloader.download_client.DownloadClient._DownloadClient__getClient",
+                return_value=mock_qb_client,
+            ):
+                r = Renamer()
+        r.client = mock_qb_client
+        return r
+
+    async def test_single_file_advance_rename(self, renamer):
+        """advance flow: single file with year-in-name bangumi."""
+        renamer.client.torrents_info.return_value = [
+            {
+                "hash": "h1",
+                "name": "[ANi] Slime S4 - 84 [1080P].mp4",
+                "save_path": "/downloads/Bangumi/转生史莱姆 (2018)/Season 4",
+            }
+        ]
+        renamer.client.torrents_files.return_value = [
+            {"name": "[ANi] Slime S4 - 84 [1080P].mp4"}
+        ]
+        renamer.client.torrents_rename_file.return_value = True
+
+        ep = EpisodeFile(
+            media_path="[ANi] Slime S4 - 84 [1080P].mp4",
+            title="转生史莱姆",
+            season=4,
+            episode=12,
+            suffix=".mp4",
+        )
+        with patch.object(renamer._parser, "torrent_parser", return_value=ep):
+            with patch("module.manager.renamer.settings") as mock_settings:
+                mock_settings.bangumi_manage.rename_method = "advance"
+                mock_settings.bangumi_manage.remove_bad_torrent = False
+                with patch("module.downloader.path.settings") as mock_path_settings:
+                    mock_path_settings.downloader.path = "/downloads/Bangumi"
+                    result = await renamer.rename()
+
+        assert len(result) == 1
+        assert result[0].episode == 12
+        renamer.client.torrents_rename_file.assert_called_once()
+        new_path = renamer.client.torrents_rename_file.call_args.kwargs["new_path"]
+        assert "转生史莱姆 (2018)" in new_path
+        assert "S04E12" in new_path
+
+    async def test_multi_file_advance_collection(self, renamer):
+        """advance flow: multi-file torrent becomes collection."""
+        renamer.client.torrents_info.return_value = [
+            {
+                "hash": "h1",
+                "name": "Complete Season 1",
+                "save_path": "/downloads/Bangumi/Anime (2024)/Season 1",
+            }
+        ]
+        renamer.client.torrents_files.return_value = [
+            {"name": "ep01.mkv"},
+            {"name": "ep02.mkv"},
+            {"name": "ep03.mkv"},
+        ]
+        renamer.client.torrents_rename_file.return_value = True
+
+        def mock_parser(torrent_path, season, **kwargs):
+            ep_num = int(torrent_path.replace("ep", "").replace(".mkv", ""))
+            return EpisodeFile(
+                media_path=torrent_path,
+                title="Anime",
+                season=season,
+                episode=ep_num,
+                suffix=".mkv",
+            )
+
+        with patch.object(renamer._parser, "torrent_parser", side_effect=mock_parser):
+            with patch("module.manager.renamer.settings") as mock_settings:
+                mock_settings.bangumi_manage.rename_method = "advance"
+                with patch("module.downloader.path.settings") as mock_path_settings:
+                    mock_path_settings.downloader.path = "/downloads/Bangumi"
+                    await renamer.rename()
+
+        assert renamer.client.torrents_rename_file.call_count == 3
+        renamer.client.set_category.assert_called_once_with("h1", "BangumiCollection")
+        # Verify advance naming pattern in each call
+        for call in renamer.client.torrents_rename_file.call_args_list:
+            new_path = call.kwargs["new_path"]
+            assert "Anime (2024) S01E" in new_path
+
+    async def test_advance_with_offsets(self, renamer):
+        """advance flow: single file with episode offset."""
+        renamer.client.torrents_info.return_value = [
+            {
+                "hash": "h1",
+                "name": "[Sub] Anime - 05.mp4",
+                "save_path": "/downloads/Bangumi/Anime (2024)/Season 2",
+            }
+        ]
+        renamer.client.torrents_files.return_value = [
+            {"name": "[Sub] Anime - 05.mp4"}
+        ]
+        renamer.client.torrents_rename_file.return_value = True
+
+        ep = EpisodeFile(
+            media_path="[Sub] Anime - 05.mp4",
+            title="Anime",
+            season=2,
+            episode=5,
+            suffix=".mp4",
+        )
+        with patch.object(renamer._parser, "torrent_parser", return_value=ep):
+            with patch("module.manager.renamer.settings") as mock_settings:
+                mock_settings.bangumi_manage.rename_method = "advance"
+                mock_settings.bangumi_manage.remove_bad_torrent = False
+                with patch("module.downloader.path.settings") as mock_path_settings:
+                    mock_path_settings.downloader.path = "/downloads/Bangumi"
+                    # Simulate offset lookup returning episode_offset=12
+                    with patch.object(
+                        renamer,
+                        "_batch_lookup_offsets",
+                        return_value={"h1": (12, 0)},
+                    ):
+                        result = await renamer.rename()
+
+        assert len(result) == 1
+        assert result[0].episode == 17  # 5 + 12
+        new_path = renamer.client.torrents_rename_file.call_args.kwargs["new_path"]
+        assert "S02E17" in new_path

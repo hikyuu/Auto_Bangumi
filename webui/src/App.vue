@@ -4,9 +4,11 @@ import { type GlobalThemeOverrides, NConfigProvider, NMessageProvider, darkTheme
 
 const { isDark } = useDarkMode();
 const { refresh, isLoggedIn } = useAuth();
+const { getConfig } = useConfigStore();
 
 if (isLoggedIn.value) {
   refresh();
+  getConfig();
 }
 
 const lightOverrides: GlobalThemeOverrides = {

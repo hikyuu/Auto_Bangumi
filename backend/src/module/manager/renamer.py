@@ -19,6 +19,24 @@ _CLEANUP_INTERVAL = 60  # Clean up pending cache at most once per minute
 _last_cleanup_time: float = 0
 
 
+# Torrent states where all files are guaranteed to be fully downloaded
+_COMPLETED_STATES = frozenset(
+    {
+        "completed",
+        "uploading",
+        "pausedUP",
+        "stalledUP",
+        "queuedUP",
+        "forcedUP",
+        "checkingUP",
+    }
+)
+# Torrent states that should be skipped entirely during rename
+_SKIP_STATES = frozenset(
+    {"missingFiles", "error", "moving", "checkingResumeData"}
+)
+
+
 class Renamer(DownloadClient):
     def __init__(self):
         super().__init__()
@@ -105,6 +123,7 @@ class Renamer(DownloadClient):
         _hash: str,
         episode_offset: int = 0,
         season_offset: int = 0,
+        verify: bool = True,
         **kwargs,
     ):
         ep = self._parser.torrent_parser(
@@ -121,46 +140,54 @@ class Renamer(DownloadClient):
                 season_offset=season_offset,
             )
             if media_path != new_path:
-                # Check if this rename was recently attempted but didn't take effect
-                # (qBittorrent can return 200 but delay actual rename while seeding)
-                pending_key = (_hash, media_path, new_path)
-                last_attempt = _pending_renames.get(pending_key)
-                if (
-                    last_attempt
-                    and (time.time() - last_attempt) < _PENDING_RENAME_COOLDOWN
-                ):
-                    logger.debug(
-                        "[Renamer] Skipping rename (pending cooldown): %s", media_path
-                    )
-                    return None
-
-                if await self.rename_torrent_file(
-                    _hash=_hash, old_path=media_path, new_path=new_path
-                ):
-                    # Rename verified successful, remove from pending cache
-                    _pending_renames.pop(pending_key, None)
-                    # Season comes from folder which already has offset applied
-                    # Only apply episode offset
-                    original_ep = int(ep.episode)
-                    if original_ep == 0 and episode_offset != 0:
-                        adjusted_episode = 0
-                    else:
-                        adjusted_episode = original_ep + episode_offset
-                    if adjusted_episode < 0 or (
-                        adjusted_episode == 0 and original_ep > 0
+                if verify:
+                    # Check if this rename was recently attempted but didn't take effect
+                    # (qBittorrent can return 200 but delay actual rename while seeding)
+                    pending_key = (_hash, media_path, new_path)
+                    last_attempt = _pending_renames.get(pending_key)
+                    if (
+                        last_attempt
+                        and (time.time() - last_attempt) < _PENDING_RENAME_COOLDOWN
                     ):
-                        adjusted_episode = original_ep
-                    return Notification(
-                        official_title=bangumi_name,
-                        season=ep.season,
-                        episode=adjusted_episode,
-                    )
+                        logger.debug(
+                            "[Renamer] Skipping rename (pending cooldown): %s", media_path
+                        )
+                        return None
+
+                    if await self.rename_torrent_file(
+                        _hash=_hash, old_path=media_path, new_path=new_path
+                    ):
+                        # Rename verified successful, remove from pending cache
+                        _pending_renames.pop(pending_key, None)
+                        original_ep = int(ep.episode)
+                        if original_ep == 0 and episode_offset != 0:
+                            adjusted_episode = 0
+                        else:
+                            adjusted_episode = original_ep + episode_offset
+                        if adjusted_episode < 0 or (
+                            adjusted_episode == 0 and original_ep > 0
+                        ):
+                            adjusted_episode = original_ep
+                        return Notification(
+                            official_title=bangumi_name,
+                            season=ep.season,
+                            episode=adjusted_episode,
+                        )
+                    else:
+                        # Rename API returned success but file wasn't actually renamed
+                        # Add to pending cache to avoid spamming
+                        _pending_renames[pending_key] = time.time()
+                        self._cleanup_pending_cache()
                 else:
-                    # Rename API returned success but file wasn't actually renamed
-                    # Add to pending cache to avoid spamming
-                    _pending_renames[pending_key] = time.time()
-                    # Periodic cleanup of expired entries (at most once per minute)
-                    self._cleanup_pending_cache()
+                    # Fire-and-forget: qBittorrent queues the rename and applies it
+                    # when the file handle is released (download completes).
+                    await self.rename_torrent_file(
+                        _hash=_hash, old_path=media_path, new_path=new_path,
+                        verify=False,
+                    )
+                    logger.debug(
+                        "[Renamer] Queued rename for downloading file: %s", media_path
+                    )
         else:
             logger.warning(f"[Renamer] {media_path} parse failed")
             if settings.bangumi_manage.remove_bad_torrent:
@@ -176,6 +203,7 @@ class Renamer(DownloadClient):
         _hash: str,
         episode_offset: int = 0,
         season_offset: int = 0,
+        verify: bool = True,
         **kwargs,
     ):
         for media_path in media_list:
@@ -194,7 +222,8 @@ class Renamer(DownloadClient):
                     )
                     if media_path != new_path:
                         renamed = await self.rename_torrent_file(
-                            _hash=_hash, old_path=media_path, new_path=new_path
+                            _hash=_hash, old_path=media_path, new_path=new_path,
+                            verify=verify,
                         )
                         if not renamed:
                             logger.warning(f"[Renamer] {media_path} rename failed")
@@ -440,10 +469,15 @@ class Renamer(DownloadClient):
         return 0, 0
 
     async def rename(self) -> list[Notification]:
-        # Get torrent info
+        # Get ALL torrents in Bangumi category — completed + downloading
+        # so files can be renamed as soon as they exist on disk.
         logger.debug("[Renamer] Start rename process.")
         rename_method = settings.bangumi_manage.rename_method
-        torrents_info = await self.get_torrent_info()
+        torrents_info = await self.get_torrent_info(status_filter="all")
+        # Filter out torrents in broken / transient states
+        torrents_info = [
+            t for t in torrents_info if t.get("state") not in _SKIP_STATES
+        ]
         renamed_info: list[Notification] = []
         # Fetch all torrent files concurrently
         all_files = await asyncio.gather(
@@ -455,6 +489,11 @@ class Renamer(DownloadClient):
             torrent_hash = info["hash"]
             torrent_name = info["name"]
             save_path = info["save_path"]
+            torrent_state = info.get("state", "")
+            # For completed torrents, verify rename happened on disk.
+            # For downloading torrents, fire-and-forget — qBittorrent queues
+            # the rename internally and applies it when the file handle is released.
+            verify = torrent_state in _COMPLETED_STATES
             media_list, subtitle_list = self.check_files(files)
             bangumi_name, season = self._path_to_bangumi(save_path, torrent_name)
             # Use pre-fetched offsets
@@ -467,6 +506,7 @@ class Renamer(DownloadClient):
                 "_hash": torrent_hash,
                 "episode_offset": episode_offset,
                 "season_offset": season_offset,
+                "verify": verify,
             }
             # Rename single media file
             if len(media_list) == 1:
@@ -482,8 +522,14 @@ class Renamer(DownloadClient):
                 await self.rename_collection(media_list=media_list, **kwargs)
                 if len(subtitle_list) > 0:
                     await self.rename_subtitles(subtitle_list=subtitle_list, **kwargs)
-                await self.set_category(torrent_hash, "BangumiCollection")
+                # Only move to BangumiCollection when torrent is fully completed
+                if torrent_state in _COMPLETED_STATES:
+                    await self.set_category(torrent_hash, "BangumiCollection")
             else:
-                logger.warning(f"[Renamer] {torrent_name} has no media file")
+                logger.debug(
+                    "[Renamer] %s has no ready media file (state=%s)",
+                    torrent_name,
+                    torrent_state,
+                )
         logger.debug("[Renamer] Rename process finished.")
         return renamed_info
