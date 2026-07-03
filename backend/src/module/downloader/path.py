@@ -56,7 +56,7 @@ class TorrentPath:
 
     @staticmethod
     def _file_depth(file_path: PathLike[str] | str):
-        return len(Path(file_path).parts)
+        return len(PureWindowsPath(file_path).parts)
 
     def is_ep(self, file_path: PathLike[str] | str):
         return self._file_depth(file_path) <= 2
