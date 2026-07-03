@@ -56,7 +56,8 @@ class TorrentPath:
 
     @staticmethod
     def _file_depth(file_path: PathLike[str] | str):
-        return len(Path(file_path).parts)
+        normalized = str(file_path).replace("\\", "/")
+        return len(Path(normalized).parts)
 
     def is_ep(self, file_path: PathLike[str] | str):
         return self._file_depth(file_path) <= 2
@@ -78,8 +79,9 @@ class TorrentPath:
             logger.warning(
                 f"[Path] Season offset would result in invalid season for {data.official_title}, using original season"
             )
+        dl_path = str(settings.downloader.path).replace("\\", "/")
         save_path = (
-            Path(settings.downloader.path) / folder / f"Season {adjusted_season}"
+            Path(dl_path) / folder / f"Season {adjusted_season}"
         )
         return str(save_path)
 
