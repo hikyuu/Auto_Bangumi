@@ -15,7 +15,8 @@ tools: [vscode, execute, read, agent, search, todo]
 执行 `git tag {tag}` → `git push origin {tag}`
 
 ## 4. 监听 CI
-等待 5 秒后用 `gh run list` 获取最新 run ID，然后用 `gh run watch` 实时监听直到完成。
+所有 `gh` 命令必须指定 `--repo hikyuu/Auto_Bangumi`（本仓库是 fork，gh 默认指向上游 `EstrellaXD/Auto_Bangumi`，不指定会查不到 run）。
+等待 5 秒后用 `gh run list --repo hikyuu/Auto_Bangumi` 获取最新 run ID，然后用 `gh run watch --repo hikyuu/Auto_Bangumi` 实时监听直到完成。
 
 ## 5. 部署到路由器
 CI 通过后 SSH 到路由器拉取新镜像并重启：
