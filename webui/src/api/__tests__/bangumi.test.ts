@@ -3,7 +3,7 @@
  * Note: These tests focus on the filter/rss_link string<->array transformations
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   mockBangumiAPI,
   mockBangumiRule,

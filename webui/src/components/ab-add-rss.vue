@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { CheckOne, Close, Copy, Down, ErrorPicture, Link, Right } from '@icon-park/vue-next';
 import { NDynamicTags, NSpin } from 'naive-ui';
-import type { BangumiRule, AIDetectOffsetResponse } from '#/bangumi';
+import type { AIDetectOffsetResponse, BangumiRule } from '#/bangumi';
 import type { RSS } from '#/rss';
 import { rssTemplate } from '#/rss';
 import { ruleTemplate } from '#/bangumi';

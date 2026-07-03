@@ -222,10 +222,10 @@ function getFieldsForType(type: string) {
     <div space-y-8>
       <!-- Global enable switch -->
       <ab-setting
+        v-model:data="notificationEnabled"
         config-key="enable"
         :label="() => t('config.notification_set.enable')"
         type="switch"
-        v-model:data="notificationEnabled"
         bottom-line
       />
 
