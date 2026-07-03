@@ -3,7 +3,6 @@ name: Build Docker
 on:
   workflow_dispatch:
   push:
-    branches: ["dev"]
     tags: ["*.*.*"]
 
 permissions:
