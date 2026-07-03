@@ -43,6 +43,7 @@ class TestRssToDownloadFlow:
             official_title="Mushoku Tensei",
             filter="",
             added=True,
+            rss_link="https://mikanani.me/RSS/mushoku",  # different from RSS item url
         )
         engine.bangumi.add(bangumi)
 
