@@ -504,14 +504,14 @@ class TestIssue992NonEpisodicAttributeError:
     ]
 
     @pytest.mark.parametrize("title", NON_EPISODIC_TITLES)
-    def test_title_parser_returns_none_for_non_episodic(self, title):
+    async def test_title_parser_returns_none_for_non_episodic(self, title, mock_settings):
         """TitleParser.raw_parser should return None instead of crashing."""
         from module.parser.title_parser import TitleParser
 
         result = TitleParser.raw_parser(title)
         assert result is None
 
-    def test_raw_parser_returns_none_for_unparseable(self):
+    def test_raw_parser_returns_none_for_unparseable(self, mock_settings):
         """raw_parser returns None for resources it cannot parse."""
         result = raw_parser(self.NON_EPISODIC_TITLES[0])
         assert result is None

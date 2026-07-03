@@ -266,19 +266,32 @@ class QbDownloader:
                         "[Downloader] Failed to verify rename: could not fetch file list"
                     )
                     continue  # Retry on next attempt
-                found_old = False
+                new_path_found = False
+                old_path_found = False
                 for f in files:
                     if f.get("name") == new_path:
-                        return True
+                        new_path_found = True
+                        break
                     if f.get("name") == old_path:
-                        found_old = True
-                if not found_old:
-                    # Neither old nor new path found - rename likely succeeded
+                        old_path_found = True
+                        break
+                if new_path_found:
                     return True
-                # File still has old name - will retry outer loop
-            # All retries exhausted, file still has old name
+                if old_path_found:
+                    if attempt < 2:
+                        continue  # Retry on next attempt
+                    # Final attempt failed
+                    logger.debug(
+                        "[Downloader] Rename API returned 200 but file unchanged: %s",
+                        old_path,
+                    )
+                    return False
+                # Neither old nor new path found - rename likely succeeded
+                return True
+            # All verify attempts exhausted without confirming success
             logger.debug(
-                "[Downloader] Rename API returned 200 but file unchanged: %s", old_path
+                "[Downloader] Rename verify exhausted after %d attempts, rename status unknown",
+                3,
             )
             return False
         except (httpx.ConnectError, httpx.RequestError, httpx.TimeoutException) as e:

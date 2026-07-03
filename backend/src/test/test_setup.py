@@ -295,5 +295,6 @@ class TestRequestValidation:
 
 class TestSentinelPath:
     def test_sentinel_path_is_in_config_dir(self):
-        assert str(SENTINEL_PATH) == "config/.setup_complete"
+        expected = Path("config") / ".setup_complete"
+        assert SENTINEL_PATH == expected
         assert SENTINEL_PATH.parent == Path("config")

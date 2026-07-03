@@ -61,10 +61,17 @@ def test_settings():
 
 @pytest.fixture
 def mock_settings(test_settings):
-    """Patch module.conf.settings globally with test defaults."""
+    """Patch module.conf.settings globally with test defaults.
+
+    Also patches module.parser.title_parser.settings because that module
+    imports it at import time via ``from module.conf import settings``,
+    creating a local reference that ``module.conf.settings`` patch alone
+    does not reach.
+    """
     with patch("module.conf.settings", test_settings):
         with patch("module.conf.config.settings", test_settings):
-            yield test_settings
+            with patch("module.parser.title_parser.settings", test_settings):
+                yield test_settings
 
 
 # ---------------------------------------------------------------------------
