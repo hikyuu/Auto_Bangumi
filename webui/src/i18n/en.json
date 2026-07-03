@@ -170,6 +170,7 @@
       "episode_offset": "Episode Offset",
       "season_offset": "Season Offset",
       "auto_detect": "Auto Detect",
+      "ai_detect": "AI Detect",
       "needs_review": "Needs Review",
       "archive": "Archive",
       "unarchive": "Unarchive",

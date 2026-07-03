@@ -1,0 +1,35 @@
+name: Send WeChat Notification on Completion
+
+on:
+  workflow_run:
+    types: ['completed']
+    workflows: ["Build Docker"]
+
+jobs:
+  send-wechat-notification-on-success:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Sending message
+        uses: chf007/action-wechat-work@master
+        env:
+          WECHAT_WORK_BOT_WEBHOOK: ${{secrets.WECHAT_WORK_BOT_WEBHOOK}}
+        with:
+          msgtype: markdown
+          content: |
+            mansion 构建<font color=green>成功</font>
+            > ${{ github.event.workflow_run.head_commit.message }}
+  send-wechat-notification-on-failure:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    steps:
+      - name: Sending message
+        uses: chf007/action-wechat-work@master
+        env:
+          WECHAT_WORK_BOT_WEBHOOK: ${{secrets.WECHAT_WORK_BOT_WEBHOOK}}
+        with:
+          msgtype: markdown
+          content: |
+            mansion 构建<font color=red>失败</font>
+            > ${{ github.event.workflow_run.head_commit.message }}
+          mentioned_list: '["@all"]'

@@ -27,6 +27,7 @@ export interface BangumiRule {
   weekday_locked: boolean;
   needs_review: boolean;
   needs_review_reason: string | null;
+  first_title?: string | null;
 }
 
 export interface BangumiAPI extends Omit<BangumiRule, 'filter' | 'rss_link'> {
@@ -67,6 +68,7 @@ export const ruleTemplate: BangumiRule = {
   weekday_locked: false,
   needs_review: false,
   needs_review_reason: null,
+  first_title: null,
 };
 
 /** Legacy offset suggestion (for backward compatibility) */
@@ -98,9 +100,24 @@ export interface DetectOffsetRequest {
   parsed_episode: number;
 }
 
+/** Request for AI detect-offset API — only title + first RSS episode title */
+export interface AIDetectOffsetRequest {
+  title: string;
+  first_title?: string | null;
+}
+
 /** Response from detect-offset API */
 export interface DetectOffsetResponse {
   has_mismatch: boolean;
   suggestion: OffsetSuggestionDetail | null;
   tmdb_info: TMDBSummary | null;
+}
+
+/** Response from AI detect-offset API */
+export interface AIDetectOffsetResponse {
+  has_mismatch: boolean;
+  suggestion: OffsetSuggestionDetail | null;
+  ai_analysis: string | null;
+  tmdb_info: TMDBSummary | null;
+  error: string | null;
 }
