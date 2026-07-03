@@ -7,7 +7,6 @@ withDefaults(defineProps<AbSettingProps>(), {
   bottomLine: false,
 });
 
- 
 const data = defineModel<any>('data');
 </script>
 
@@ -26,6 +25,7 @@ const data = defineModel<any>('data');
         v-model="data"
         v-bind="prop"
         :class="css"
+        :editable="prop?.editable ?? false"
       ></AbSelect>
 
       <input

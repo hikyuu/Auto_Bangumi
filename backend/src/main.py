@@ -66,6 +66,18 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
+@app.get("/api/health", tags=["health"])
+def health():
+    """Docker health check endpoint.
+
+    - starting: 应用已启动但后台初始化尚未完成
+    - healthy:  应用已就绪，正常运行中
+    """
+    if not program._startup_done:
+        return {"status": "starting"}
+    return {"status": "healthy"}
+
+
 _POSTERS_BASE = Path("data/posters").resolve()
 
 
