@@ -1,7 +1,7 @@
 ---
 description: "根据 pyproject.toml 版本号打 beta tag → 推送 → 监听 CI → 路由器拉取新镜像重启"
 agent: agent
-tools: [terminal, web]
+tools: [vscode, execute, read, agent, search, todo]
 ---
 # 打 beta tag 发布流程
 
