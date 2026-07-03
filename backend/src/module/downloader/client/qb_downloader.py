@@ -19,7 +19,7 @@ class QbDownloader:
         self.username = username
         self.password = password
         self.ssl = ssl
-        self._client: httpx.AsyncClient | None = None
+        self._client: httpx.AsyncClient = None  # type: ignore[assignment]
 
     def _url(self, endpoint: str) -> str:
         return f"{self.host}/api/v2/{endpoint}"
@@ -100,7 +100,7 @@ class QbDownloader:
             ) as e:
                 logger.debug("[Downloader] Logout request failed (non-critical): %s", e)
             await self._client.aclose()
-            self._client = None
+            self._client = None  # type: ignore[assignment]
 
     async def check_host(self):
         try:
@@ -273,18 +273,27 @@ class QbDownloader:
                         new_path_found = True
                         break
                     if f.get("name") == old_path:
-                        # File still has old name - break inner loop and retry
-                        if attempt < 2:
-                            break
-                        # Final attempt failed
-                        logger.debug(
-                            "[Downloader] Rename API returned 200 but file unchanged: %s",
-                            old_path,
-                        )
-                        return False
-                # new_path found or old_path not found
+                        old_path_found = True
+                        break
+                if new_path_found:
+                    return True
+                if old_path_found:
+                    if attempt < 2:
+                        continue  # Retry on next attempt
+                    # Final attempt failed
+                    logger.debug(
+                        "[Downloader] Rename API returned 200 but file unchanged: %s",
+                        old_path,
+                    )
+                    return False
+                # Neither old nor new path found - rename likely succeeded
                 return True
-            return True
+            # All verify attempts exhausted without confirming success
+            logger.debug(
+                "[Downloader] Rename verify exhausted after %d attempts, rename status unknown",
+                3,
+            )
+            return False
         except (httpx.ConnectError, httpx.RequestError, httpx.TimeoutException) as e:
             logger.warning(f"[Downloader] Failed to rename file {old_path}: {e}")
             return False
