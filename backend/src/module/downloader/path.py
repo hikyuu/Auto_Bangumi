@@ -36,9 +36,13 @@ class TorrentPath:
 
     @staticmethod
     def _path_to_bangumi(save_path: PathLike[str] | str, torrent_name: str = ""):
+        # Normalize path separators so pathlib can split correctly on any OS.
+        # Windows paths (e.g. X:\foo\bar) use backslashes which Linux pathlib
+        # treats as a single literal filename.
+        normalized = str(save_path).replace("\\", "/")
         # Split save path and download path
-        save_parts = Path(save_path).parts
-        download_parts = Path(settings.downloader.path).parts
+        save_parts = Path(normalized).parts
+        download_parts = Path(str(settings.downloader.path).replace("\\", "/")).parts
         # Get bangumi name and season
         bangumi_name = ""
         season = 1
@@ -53,7 +57,8 @@ class TorrentPath:
 
     @staticmethod
     def _file_depth(file_path: PathLike[str] | str):
-        return len(Path(file_path).parts)
+        normalized = str(file_path).replace("\\", "/")
+        return len(Path(normalized).parts)
 
     def is_ep(self, file_path: PathLike[str] | str):
         return self._file_depth(file_path) <= 2
@@ -75,8 +80,9 @@ class TorrentPath:
             logger.warning(
                 f"[Path] Season offset would result in invalid season for {data.official_title}, using original season"
             )
+        dl_path = str(settings.downloader.path).replace("\\", "/")
         save_path = (
-            Path(settings.downloader.path) / folder / f"Season {adjusted_season}"
+            Path(dl_path) / folder / f"Season {adjusted_season}"
         )
         return str(save_path)
 
