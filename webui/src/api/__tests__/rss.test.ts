@@ -3,7 +3,7 @@
  * Note: These tests focus on data structures and endpoint paths
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   mockRSSItem,
   mockRSSList,

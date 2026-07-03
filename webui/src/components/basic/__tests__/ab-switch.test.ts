@@ -2,9 +2,9 @@
  * Tests for AbSwitch component
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
-import { h, defineComponent, ref } from 'vue';
+import { defineComponent, h } from 'vue';
 import AbSwitch from '../ab-switch.vue';
 
 // Mock @headlessui/vue Switch component
