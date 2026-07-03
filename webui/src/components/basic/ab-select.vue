@@ -97,8 +97,8 @@ watch(selected, (val) => {
       <ComboboxInput
         class="select-input"
         :display-value="(val: any) => (isString(val) ? val : '')"
-        @change="query = $event.target.value"
         placeholder="gpt-4o"
+        @change="query = $event.target.value"
       />
       <ComboboxButton class="select-button">
         <div :class="[{ hidden: !open }]"><Up :size="14" /></div>

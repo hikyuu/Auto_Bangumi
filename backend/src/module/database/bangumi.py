@@ -523,6 +523,27 @@ class BangumiDatabase:
         result = self.session.execute(statement)
         return list(result.scalars().all())
 
+    def search_by_rss_url(self, rss_url: str) -> Optional[Bangumi]:
+        """Find the bangumi that owns a given RSS URL.
+
+        ``rss_link`` is a comma-separated list of RSS URLs, so this checks
+        whether *rss_url* is contained within ``Bangumi.rss_link``.
+        Returns the first match.
+        """
+        if not rss_url:
+            return None
+        statement = (
+            select(Bangumi)
+            .where(
+                and_(
+                    func.instr(Bangumi.rss_link, rss_url) > 0,
+                    Bangumi.deleted == false(),
+                )
+            )
+        )
+        result = self.session.execute(statement)
+        return result.scalars().first()
+
     def archive_one(self, _id: int) -> bool:
         """Set archived=True for the given bangumi."""
         bangumi = self.session.get(Bangumi, _id)
@@ -552,8 +573,8 @@ class BangumiDatabase:
     def match_by_save_path(self, save_path: str) -> Optional[Bangumi]:
         """Find bangumi by save_path to get offset.
 
-        Tries exact match first, then falls back to matching with/without trailing slashes
-        and different path separators.
+        Normalizes both input and DB-side path separators (``\\`` → ``/``) so that
+        cross-platform paths (Windows host + Docker container) match correctly.
 
         Note: When multiple subscriptions share the same save_path (e.g., different RSS
         sources for the same anime), this returns the first match. Use match_torrent()
@@ -562,7 +583,7 @@ class BangumiDatabase:
         if not save_path:
             return None
 
-        # Try exact match first
+        # Try exact match first (fast path for already-consistent separators)
         statement = select(Bangumi).where(
             and_(Bangumi.save_path == save_path, Bangumi.deleted == false())
         )
@@ -571,25 +592,16 @@ class BangumiDatabase:
         if bangumi:
             return bangumi
 
-        # Normalize the input path and try variations
-        normalized = save_path.replace("\\", "/").rstrip("/")
-        variations = [
-            normalized,
-            normalized + "/",
-            save_path.rstrip("/"),
-            save_path.rstrip("\\"),
-        ]
-        # Remove duplicates while preserving order
-        seen = {save_path}
-        unique_variations = []
-        for v in variations:
-            if v not in seen:
-                seen.add(v)
-                unique_variations.append(v)
+        # Normalize input to forward slashes (cross-platform comparison)
+        normalized_input = save_path.replace("\\", "/").rstrip("/")
 
-        for variant in unique_variations:
+        # Try exact match with normalized DB-side separators (handles mixed \\ and /)
+        for variant in (normalized_input, normalized_input + "/"):
             statement = select(Bangumi).where(
-                and_(Bangumi.save_path == variant, Bangumi.deleted == false())
+                and_(
+                    func.replace(Bangumi.save_path, "\\", "/") == variant,
+                    Bangumi.deleted == false(),
+                )
             )
             result = self.session.execute(statement)
             bangumi = result.scalars().first()
