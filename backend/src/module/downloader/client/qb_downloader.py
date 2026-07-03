@@ -266,10 +266,12 @@ class QbDownloader:
                         "[Downloader] Failed to verify rename: could not fetch file list"
                     )
                     continue  # Retry on next attempt
-                found_old = False
+                new_path_found = False
+                old_path_found = False
                 for f in files:
                     if f.get("name") == new_path:
-                        return True
+                        new_path_found = True
+                        break
                     if f.get("name") == old_path:
                         # File still has old name - break inner loop and retry
                         if attempt < 2:

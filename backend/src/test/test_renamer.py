@@ -383,6 +383,7 @@ class TestRenameFlow:
                 "hash": "h1",
                 "name": "[Sub] Anime - 01.mkv",
                 "save_path": "/downloads/Bangumi/Anime (2024)/Season 1",
+                "state": "completed",
             }
         ]
         renamer.client.torrents_files.return_value = [{"name": "[Sub] Anime - 01.mkv"}]
@@ -413,6 +414,7 @@ class TestRenameFlow:
                 "hash": "h1",
                 "name": "Anime Collection",
                 "save_path": "/downloads/Bangumi/Anime (2024)/Season 1",
+                "state": "completed",
             }
         ]
         renamer.client.torrents_files.return_value = [
@@ -1270,6 +1272,8 @@ class TestRenameFlowAdvance:
                 "hash": "h1",
                 "name": "[ANi] Slime S4 - 84 [1080P].mp4",
                 "save_path": "/downloads/Bangumi/转生史莱姆 (2018)/Season 4",
+                "state": "completed",
+                "state": "completed",
             }
         ]
         renamer.client.torrents_files.return_value = [
@@ -1306,6 +1310,7 @@ class TestRenameFlowAdvance:
                 "hash": "h1",
                 "name": "Complete Season 1",
                 "save_path": "/downloads/Bangumi/Anime (2024)/Season 1",
+                "state": "completed",
             }
         ]
         renamer.client.torrents_files.return_value = [
@@ -1346,6 +1351,7 @@ class TestRenameFlowAdvance:
                 "hash": "h1",
                 "name": "[Sub] Anime - 05.mp4",
                 "save_path": "/downloads/Bangumi/Anime (2024)/Season 2",
+                "state": "completed",
             }
         ]
         renamer.client.torrents_files.return_value = [
