@@ -18,6 +18,7 @@ export const mockLoginSuccess: LoginSuccess = {
 };
 
 export const mockApiSuccess: ApiSuccess = {
+  status: true,
   msg_en: 'Success',
   msg_zh: '成功',
 };

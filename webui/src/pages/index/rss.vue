@@ -87,7 +87,7 @@ const rssRowKey = (row: RSS) => row.id;
         ]"
         :selectable="true"
         key-field="id"
-        @select="(keys) => (selectedRSS = keys as number[])"
+        @select="(keys: unknown[]) => (selectedRSS = keys as number[])"
       >
         <template #item="{ item }">
           <div class="rss-card-content">

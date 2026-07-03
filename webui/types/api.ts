@@ -19,6 +19,7 @@ export interface ApiError {
 }
 
 export interface ApiSuccess {
+  status: boolean;
   msg_en: string;
   msg_zh: string;
 }

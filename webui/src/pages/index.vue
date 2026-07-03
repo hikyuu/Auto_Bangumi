@@ -33,11 +33,11 @@ const { updateRule, enableRule, archiveRule, unarchiveRule, ruleManage } = useBa
     <ab-edit-rule
       v-model:show="editRule.show"
       v-model:rule="editRule.item"
-      @enable="(id) => enableRule(id)"
-      @archive="(id) => archiveRule(id)"
-      @unarchive="(id) => unarchiveRule(id)"
-      @delete-file="(type, { id, deleteFile }) => ruleManage(type, id, deleteFile)"
-      @apply="(rule) => updateRule(rule.id, rule)"
+      @enable="(id: number) => enableRule(id)"
+      @archive="(id: number) => archiveRule(id)"
+      @unarchive="(id: number) => unarchiveRule(id)"
+      @delete-file="(type: any, payload: any) => ruleManage(type, payload.id, payload.deleteFile)"
+      @apply="(rule: any) => updateRule(rule.id, rule)"
     />
   </div>
 </template>

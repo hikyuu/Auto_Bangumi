@@ -9,8 +9,7 @@ interface Options<T = any> {
 }
 
 export function useApi<
-  TApi extends AnyAsyncFuntion = AnyAsyncFuntion,
-  TData = Awaited<ReturnType<TApi>>
+  TApi extends AnyAsyncFuntion = AnyAsyncFuntion, TData = Awaited<ReturnType<TApi>>
 >(
   api: TApi,
   {
