@@ -189,8 +189,12 @@ class RSSEngine(Database):
             rss_item.last_checked_at = now
             rss_item.last_error = error
             self.add(rss_item)
+            # Pre-lookup owning bangumi via RSS URL to avoid name-matching issues
+            owning_bangumi = self.bangumi.search_by_rss_url(rss_item.url)
             for torrent in new_torrents:
-                matched_data = self.match_torrent(torrent)
+                matched_data = self._match_torrent_by_owner(
+                    torrent, owning_bangumi
+                ) or self.match_torrent(torrent)
                 if matched_data:
                     if await client.add_torrent(torrent, matched_data):
                         logger.debug("[Engine] Add torrent %s to client", torrent.name)
@@ -198,6 +202,25 @@ class RSSEngine(Database):
             # Add all torrents to database
             self.torrent.add_all(new_torrents)
         self.commit()
+
+    def _match_torrent_by_owner(
+        self, torrent: Torrent, owning_bangumi: Optional[Bangumi]
+    ) -> Optional[Bangumi]:
+        """Match a torrent to its owning bangumi found via RSS URL lookup.
+
+        Applies the same filter check as ``match_torrent`` so filter rules
+        are still enforced even when the bangumi is identified without
+        name matching.
+        """
+        if not owning_bangumi or owning_bangumi.deleted:
+            return None
+        if owning_bangumi.filter == "":
+            return owning_bangumi
+        pattern = self._get_filter_pattern(owning_bangumi.filter)
+        if not pattern.search(torrent.name):
+            torrent.bangumi_id = owning_bangumi.id
+            return owning_bangumi
+        return None
 
     async def download_bangumi(self, bangumi: Bangumi):
         async with RequestContent() as req:
