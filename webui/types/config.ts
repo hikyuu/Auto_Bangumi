@@ -20,7 +20,7 @@ export type NotificationType = [
   'webhook',
 ];
 /** OpenAI Model List */
-export type OpenAIModel = ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'];
+export type OpenAIModel = string[];
 /** OpenAI API Type */
 export type OpenAIType = ['openai', 'azure'];
 

@@ -18,6 +18,7 @@ FROM python:3.13-alpine AS runtime
 
 RUN apk add --no-cache \
     bash \
+    curl \
     su-exec \
     shadow \
     tini \
@@ -45,5 +46,8 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 EXPOSE 7892
 VOLUME ["/app/config", "/app/data"]
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -sf http://localhost:7892/api/health || exit 1
 
 ENTRYPOINT ["tini", "-g", "--", "/entrypoint.sh"]
