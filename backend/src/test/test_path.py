@@ -57,7 +57,8 @@ class TestGenSavePath:
             mock_settings.downloader.path = "/mnt/media/Bangumi"
             result = TorrentPath._gen_save_path(bangumi)
 
-        assert result.startswith("/mnt/media/Bangumi")
+        result_path = result.replace("\\", "/")
+        assert result_path.startswith("/mnt/media/Bangumi")
         assert "Test (2025)" in result
         assert "Season 3" in result
 

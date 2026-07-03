@@ -198,6 +198,7 @@ class TestRenameFlow:
                 "hash": "abc123",
                 "name": "[Lilith-Raws] Mushoku Tensei - 11 [1080p].mkv",
                 "save_path": "/downloads/Bangumi/Mushoku Tensei (2024)/Season 1",
+                "state": "completed",
             }
         ]
         mock_qb_client.torrents_files.return_value = [
@@ -255,6 +256,7 @@ class TestRenameFlow:
                 "hash": "batch_hash",
                 "name": "Anime Batch",
                 "save_path": "/downloads/Bangumi/Anime (2024)/Season 1",
+                "state": "completed",
             }
         ]
         mock_qb_client.torrents_files.return_value = [
