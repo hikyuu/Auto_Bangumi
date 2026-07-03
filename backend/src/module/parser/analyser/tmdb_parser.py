@@ -47,8 +47,12 @@ class TMDBInfo:
 LANGUAGE = {"zh": "zh-CN", "jp": "ja-JP", "en": "en-US"}
 
 
-def search_url(e):
-    return f"{TMDB_URL}/3/search/tv?api_key={TMDB_API}&page=1&query={e}&include_adult=false"
+def search_url(e, lang="zh-CN"):
+    return (
+        f"{TMDB_URL}/3/search/tv?api_key={TMDB_API}"
+        f"&page=1&query={e}&include_adult=false"
+        f"&language={lang}"
+    )
 
 
 def info_url(e, key):
@@ -205,13 +209,13 @@ async def tmdb_parser(title, language, test: bool = False) -> TMDBInfo | None:
         return _tmdb_cache[cache_key]
 
     async with RequestContent() as req:
-        url = search_url(title)
+        url = search_url(title, LANGUAGE.get(language, "zh-CN"))
         contents = await req.get_json(url)
         if not contents:
             return None
         contents = contents.get("results")
         if contents.__len__() == 0:
-            url = search_url(title.replace(" ", ""))
+            url = search_url(title.replace(" ", ""), LANGUAGE.get(language, "zh-CN"))
             contents_resp = await req.get_json(url)
             if not contents_resp:
                 return None

@@ -59,18 +59,26 @@ class TitleParser:
     @staticmethod
     async def raw_parser(raw: str) -> Bangumi | None:
         language = settings.rss_parser.language
-        try:
-            # use OpenAI ChatGPT to parse raw title and get structured data
-            if settings.experimental_openai.enable:
+        episode = None
+        # Try OpenAI parser first, fall back to regex parser on failure
+        if settings.experimental_openai.enable:
+            try:
                 kwargs = settings.experimental_openai.dict(exclude={"enable"})
                 gpt = OpenAIParser(**kwargs)
                 episode_dict = await gpt.parse(raw, asdict=True)
                 episode = Episode(**episode_dict)
-            else:
-                episode = raw_parser(raw)
-                if episode is None:
-                    return None
+            except Exception as e:
+                logger.warning(
+                    "OpenAI title parsing failed for '%s': %s, falling back to regex",
+                    raw, e,
+                )
+                episode = None
+        if episode is None:
+            episode = raw_parser(raw)
+            if episode is None:
+                return None
 
+        try:
             titles = {
                 "zh": episode.title_zh,
                 "en": episode.title_en,

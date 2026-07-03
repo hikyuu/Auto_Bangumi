@@ -220,3 +220,5 @@ test.*
 # local config
 /backend/config/
 .claude/settings.local.json
+/backend/data
+/data

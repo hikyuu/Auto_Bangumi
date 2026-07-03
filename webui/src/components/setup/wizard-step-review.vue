@@ -10,10 +10,14 @@ async function completeSetup() {
   isLoading.value = true;
   try {
     const request = setupStore.buildCompleteRequest();
-    await apiSetup.complete(request);
-    message.success(t('setup.review.success'));
-    setupStore.$reset();
-    router.push({ name: 'Login' });
+    const result = await apiSetup.complete(request);
+    if (result.status) {
+      message.success(t('setup.review.success'));
+      setupStore.$reset();
+      router.push({ name: 'Login' });
+    } else {
+      message.error(result.msg_zh || t('setup.review.failed'));
+    }
   } catch (e) {
     message.error(t('setup.review.failed'));
   } finally {

@@ -170,6 +170,7 @@
       "episode_offset": "集数偏移",
       "season_offset": "季度偏移",
       "auto_detect": "自动检测",
+      "ai_detect": "AI检测",
       "needs_review": "需要检查",
       "archive": "归档",
       "unarchive": "取消归档",

@@ -1,13 +1,17 @@
+import logging
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from module.downloader import DownloadClient
 from module.manager import SeasonCollector
-from module.models import APIResponse, Bangumi, RSSItem, RSSUpdate, Torrent
+from module.models import APIResponse, Bangumi, ResponseModel, RSSItem, RSSUpdate, Torrent
 from module.rss import RSSAnalyser, RSSEngine
 from module.security.api import UNAUTHORIZED, get_current_user
 
 from .response import u_response
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/rss", tags=["rss"])
 
@@ -174,14 +178,25 @@ analyser = RSSAnalyser()
 
 
 @router.post(
-    "/analysis", response_model=Bangumi, dependencies=[Depends(get_current_user)]
+    "/analysis", dependencies=[Depends(get_current_user)]
 )
 async def analysis(rss: RSSItem):
-    data = await analyser.link_to_data(rss)
-    if isinstance(data, Bangumi):
-        return data
-    else:
-        return u_response(data)
+    try:
+        data, first_title = await analyser.link_to_data(rss)
+        if isinstance(data, Bangumi):
+            result = data.model_dump()
+            result['first_title'] = first_title
+            return result
+        else:
+            return u_response(data)
+    except Exception as e:
+        logger.exception(f"[RSS] Analysis failed: {e}")
+        return ResponseModel(
+            status=False,
+            status_code=500,
+            msg_en=str(e),
+            msg_zh=f"解析失败: {e}",
+        )
 
 
 @router.post(

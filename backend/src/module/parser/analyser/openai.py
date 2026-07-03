@@ -23,12 +23,25 @@ class Episode(BaseModel):
     source: str
 
 
+EPISODE_FIELD_DESC = """\
+Output JSON fields:
+- title_en (string): English title
+- title_zh (string): Chinese title
+- title_jp (string): Japanese title
+- season (number): season number parsed from title
+- season_raw (string): raw season text
+- episode (number): episode number
+- sub (string): subtitle language
+- group (string): fansub group name
+- resolution (string): video resolution
+- source (string): video source
+Leave field as "" or 0 when not found. Do NOT fabricate data."""
+
 DEFAULT_PROMPT = """\
 You will now play the role of a super assistant. 
 Your task is to extract structured data from unstructured text content and output it in JSON format. 
 If you are unable to extract any information, please keep all fields and leave the field empty or default value like `''`, `None`.
-But Do not fabricate data!
-"""
+But Do not fabricate data!"""
 
 
 class OpenAIParser:
@@ -81,59 +94,56 @@ class OpenAIParser:
         Args:
             text (str): the text to be parsed
             prompt (str | None, optional):
-                the custom prompt. Built-in prompt will be used if no prompt is provided. \
+                the custom prompt. Built-in prompt will be used if no prompt is provided.
                 Defaults to None.
             asdict (bool, optional):
-                whether to return the result as dict or not. \
+                whether to return the result as dict or not.
                 Defaults to True.
 
         Returns:
             dict | str: the parsed result.
         """
+        is_default_prompt = prompt is None
         if not prompt:
             prompt = DEFAULT_PROMPT
 
-        params = self._prepare_params(text, prompt)
+        params = self._prepare_params(text, prompt, is_default_prompt)
 
-        resp = await self.client.beta.chat.completions.parse(**params)
-        result = resp.choices[0].message.parsed
+        resp = await self.client.chat.completions.create(**params)
+        result = resp.choices[0].message.content
 
         if asdict:
-            if hasattr(result, "model_dump"):
-                result = result.model_dump()
-            else:
-                try:
-                    result = json.loads(
-                        result[result.index("{") : result.rindex("}") + 1]
-                    )  # find the first { and last } for better compatibility
-                except (json.JSONDecodeError, ValueError):
-                    logger.warning(f"Cannot parse result {result} as python dict.")
+            try:
+                result = json.loads(
+                    result[result.index("{") : result.rindex("}") + 1]
+                )  # find the first { and last } for better compatibility
+            except (json.JSONDecodeError, ValueError):
+                logger.warning(f"Cannot parse result {result} as python dict.")
 
         logger.debug("the parsed result is: %s", result)
 
         return result
 
-    def _prepare_params(self, text: str, prompt: str) -> dict[str, Any]:
-        """_prepare_params is a helper function to prepare params for openai library.
-        There are some differences between openai and azure openai api, so we need to
-        prepare params for them.
+    def _prepare_params(
+        self, text: str, prompt: str, is_default_prompt: bool = False,
+    ) -> dict[str, Any]:
+        """Prepare params for openai chat completions API.
 
-        Args:
-            text (str): the text to be parsed
-            prompt (str): the custom prompt
-
-        Returns:
-            dict[str, Any]: the prepared key value pairs.
+        When using the default title-parsing prompt, appends Episode field
+        descriptions so the LLM knows the exact JSON structure to output.
         """
+        system_content = prompt
+        if is_default_prompt:
+            system_content = prompt + "\n\n" + EPISODE_FIELD_DESC
+
         params = dict(
             model=self.model,
             messages=[
-                dict(role="system", content=prompt),
+                dict(role="system", content=system_content),
                 dict(role="user", content=text),
             ],
-            response_format=Episode,
-            # set temperature to 0 to make results be more stable and reproducible.
             temperature=0,
+            response_format={"type": "json_object"},
         )
 
         api_type = self.openai_kwargs.get("api_type", "openai")

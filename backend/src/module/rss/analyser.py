@@ -83,7 +83,7 @@ class RSSAnalyser(TitleParser):
         else:
             return []
 
-    async def link_to_data(self, rss: RSSItem) -> Bangumi | ResponseModel:
+    async def link_to_data(self, rss: RSSItem) -> tuple[Bangumi | ResponseModel, str | None]:
         torrents = await self.get_rss_torrents(rss.url, False)
         if not torrents:
             return ResponseModel(
@@ -91,14 +91,17 @@ class RSSAnalyser(TitleParser):
                 status_code=406,
                 msg_en="Cannot find any torrent.",
                 msg_zh="无法找到种子。",
-            )
+            ), None
+        # Last torrent title for AI offset detection (RSS feeds are typically reverse chronological,
+        # so the last item is the earliest/first episode, best for understanding baseline numbering)
+        first_title = torrents[-1].name if torrents else None
         for torrent in torrents:
             data = await self.torrent_to_data(torrent, rss)
             if data:
-                return data
+                return data, first_title
         return ResponseModel(
             status=False,
             status_code=406,
             msg_en="Cannot parse this link.",
             msg_zh="无法解析此链接。",
-        )
+        ), first_title

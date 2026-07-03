@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import { CheckOne, Close, Copy, Down, ErrorPicture, Link, Right } from '@icon-park/vue-next';
 import { NDynamicTags, NSpin } from 'naive-ui';
-import type { BangumiRule } from '#/bangumi';
+import type { BangumiRule, AIDetectOffsetResponse } from '#/bangumi';
 import type { RSS } from '#/rss';
 import { rssTemplate } from '#/rss';
 import { ruleTemplate } from '#/bangumi';
@@ -23,6 +23,13 @@ const showAdvanced = ref(true);
 const copied = ref(false);
 const offsetLoading = ref(false);
 const offsetReason = ref('');
+
+// AI detection state
+const { getSettingGroup } = useConfigStore();
+const openAIConfig = getSettingGroup('experimental_openai');
+const isLLMEnabled = computed(() => openAIConfig.value.enable);
+const aiLoading = ref(false);
+const aiResult = ref('');
 
 const loading = reactive({
   analyze: false,
@@ -178,6 +185,38 @@ async function autoDetectOffset() {
     message.error('Failed to detect offset');
   } finally {
     offsetLoading.value = false;
+  }
+}
+
+// AI detect offset using LLM
+async function aiDetectOffset() {
+  if (!rule.value.official_title || !rule.value.season) return;
+  aiLoading.value = true;
+  aiResult.value = '';
+  try {
+    const result: AIDetectOffsetResponse = await apiBangumi.detectOffsetAI({
+      title: rule.value.official_title,
+      first_title: rule.value.first_title ?? undefined,
+    });
+
+    if (result.error) {
+      message.error(result.error);
+      return;
+    }
+
+    if (result.has_mismatch && result.suggestion) {
+      rule.value.season_offset = result.suggestion.season_offset;
+      rule.value.episode_offset = result.suggestion.episode_offset;
+      aiResult.value = result.ai_analysis ? `AI: ${result.ai_analysis}` : '';
+      message.success(t('offset.suggestion_applied'));
+    } else {
+      message.info(t('offset.no_mismatch'));
+    }
+  } catch (e) {
+    console.error('AI offset detection failed:', e);
+    message.error('AI detection failed');
+  } finally {
+    aiLoading.value = false;
   }
 }
 
@@ -351,19 +390,48 @@ function subscribe() {
                       </div>
                     </div>
 
-                    <!-- Offset row -->
+                    <!-- Season offset row -->
                     <div class="advanced-row">
-                      <label class="advanced-label">{{ $t('homepage.rule.offset') }}</label>
-                      <div class="advanced-control offset-controls">
+                      <label class="advanced-label">{{ $t('homepage.rule.season_offset') }}</label>
+                      <div class="advanced-control">
+                        <input
+                          v-model.number="rule.season_offset"
+                          type="number"
+                          ab-input
+                          class="offset-input"
+                        />
+                      </div>
+                    </div>
+
+                    <!-- Episode offset row -->
+                    <div class="advanced-row">
+                      <label class="advanced-label">{{ $t('homepage.rule.episode_offset') }}</label>
+                      <div class="advanced-control">
                         <input
                           v-model.number="rule.episode_offset"
                           type="number"
                           ab-input
                           class="offset-input"
                         />
+                      </div>
+                    </div>
+
+                    <!-- Detect buttons row -->
+                    <div class="advanced-row">
+                      <span class="advanced-label" />
+                      <div class="advanced-control detect-buttons">
+                        <button
+                          v-if="isLLMEnabled"
+                          class="ai-detect-btn"
+                          :disabled="aiLoading || offsetLoading"
+                          @click="aiDetectOffset"
+                        >
+                          <NSpin v-if="aiLoading" :size="14" />
+                          <span v-else>{{ $t('homepage.rule.ai_detect') }}</span>
+                        </button>
                         <button
                           class="detect-btn"
-                          :disabled="offsetLoading || !rule.id"
+                          :disabled="offsetLoading || aiLoading || !rule.id"
                           @click="autoDetectOffset"
                         >
                           <NSpin v-if="offsetLoading" :size="14" />
@@ -372,6 +440,7 @@ function subscribe() {
                       </div>
                     </div>
                     <div v-if="offsetReason" class="offset-reason">{{ offsetReason }}</div>
+                    <div v-if="aiResult" class="ai-result">{{ aiResult }}</div>
                   </div>
                 </Transition>
               </div>
@@ -984,6 +1053,12 @@ function subscribe() {
   height: 32px;
 }
 
+.detect-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .offset-input {
   width: 70px;
   height: 32px;
@@ -1016,6 +1091,47 @@ function subscribe() {
     opacity: 0.5;
     cursor: not-allowed;
   }
+}
+
+.ai-detect-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 70px;
+  height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 500;
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-accent), color-mix(in srgb, var(--color-accent) 70%, var(--color-primary)));
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity var(--transition-fast), background var(--transition-fast);
+
+  &:hover:not(:disabled) {
+    background: linear-gradient(135deg, var(--color-accent-hover, color-mix(in srgb, var(--color-accent) 80%, #000)), color-mix(in srgb, var(--color-accent) 60%, var(--color-primary)));
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.ai-result {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--color-accent) 60%, var(--color-text-secondary));
+  line-height: 1.5;
+  margin-top: -4px;
+  padding: 6px 10px;
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 20%, transparent);
+  border-radius: var(--radius-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .offset-reason {
