@@ -1,5 +1,30 @@
 # [Unreleased]
 
+# [3.2.8-beta.4] - 2026-07-05
+
+## Backend
+
+### Fixed
+
+- 修复删除番剧时种子未关联 bangumi_id：`match_torrent`、`_match_torrent_by_owner`、`download_bangumi` 三处补写 `torrent.bangumi_id`，新增 migration v10 回填旧数据
+- 修复 `stoppedUP` 状态种子改名失败：改名前后加 resume/pause，`_PAUSED_STATES` 纳入 `stoppedUP`
+- 修复跨平台路径分隔符导致季度解析错误：`_path_to_bangumi` 和 `_file_depth` 改用 `PureWindowsPath`
+- 修复 `__match_torrents_list` 路径归一化匹配 `save_path`
+- 修复重命名验证循环逻辑：`continue` 改为 `break`
+- 改进种子的番剧匹配：支持 RSS URL 反查
+
+### Maintenance
+
+- 新增 AI 偏移量检测功能配置
+- CI：从 pnpm 9 → 11，Node 20 → 22，移除 arm64 构建
+- CI：支持通过 tag 注入版本（alpha/beta）
+
+## Frontend
+
+### Changed
+
+- 优化 ab-select 组件标签显示逻辑，支持前端排序和内部渲染 (#2302)
+
 # [3.2.8] - 2026-07-02
 
 ## Backend
