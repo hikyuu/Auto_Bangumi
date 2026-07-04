@@ -25,9 +25,8 @@ const offsetLoading = ref(false);
 const offsetReason = ref('');
 
 // AI detection state
-const { getSettingGroup } = useConfigStore();
-const openAIConfig = getSettingGroup('experimental_openai');
-const isLLMEnabled = computed(() => openAIConfig.value.enable);
+const configStore = useConfigStore();
+const isLLMEnabled = computed(() => configStore.config.experimental_openai.enable);
 const aiLoading = ref(false);
 const aiResult = ref('');
 
