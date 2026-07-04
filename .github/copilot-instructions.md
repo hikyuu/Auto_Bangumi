@@ -18,3 +18,8 @@
 some_command 2> nul
 some_command > nul
 ```
+
+## 前端修改 — 禁止运行格式化命令
+
+修改 `webui/` 下的前端文件后，**不要运行 `pnpm format`、`pnpm lint:fix` 等格式化命令**。
+这些命令会改动大量无关行，导致 PR diff 膨胀。只做精确的最小逻辑改动即可。格式化由项目维护者在合并前统一处理。
