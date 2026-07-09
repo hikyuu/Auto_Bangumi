@@ -1,5 +1,13 @@
 # [Unreleased]
 
+# [3.2.8-beta.7] - 2026-07-09
+
+## Backend
+
+### Fixed
+
+- 修复删除番剧后未清理孤立 RSS 订阅条目（#1053）：新增 `_delete_orphan_sub_rss` 方法，在 `delete_rule` 中调用
+
 # [3.2.8-beta.4] - 2026-07-05
 
 ## Backend
