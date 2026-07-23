@@ -169,6 +169,7 @@ cython_debug/
 /backend/src/module/debug_run.sh
 /backend/src/module/__version__.py
 /backend/src/data/
+data/
 
 /src/module/conf/config_dev.ini
 
