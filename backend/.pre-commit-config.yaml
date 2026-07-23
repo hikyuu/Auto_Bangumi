@@ -1,11 +1,13 @@
-repos:
-- repo: https://github.com/psf/black
-  rev: 22.10.0
-  hooks:
-    - id: black
-      language: python
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  # Ruff version.
-  rev: v0.0.291
-  hooks:
-    - id: ruff
+# 格式化已禁用，提交时不自动运行 black/ruff
+# 如需恢复，取消下方注释即可
+# repos:
+# - repo: https://github.com/psf/black
+#   rev: 22.10.0
+#   hooks:
+#     - id: black
+#       language: python
+# - repo: https://github.com/astral-sh/ruff-pre-commit
+#   # Ruff version.
+#   rev: v0.0.291
+#   hooks:
+#     - id: ruff
