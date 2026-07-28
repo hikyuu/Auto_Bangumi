@@ -40,6 +40,8 @@ const { posterSrc, infoTags, showAdvanced, copied, copyRssLink } =
   useBangumiRuleForm(localRule);
 const offsetLoading = ref(false);
 const offsetReason = ref('');
+const aiOffsetLoading = ref(false);
+const aiOffsetResult = ref<{ season_offset: number; episode_offset: number; reason: string; confidence: string } | null>(null);
 const dismissingReview = ref(false);
 
 // Delete file dialog state
@@ -129,6 +131,54 @@ async function autoDetectOffset() {
     message.error(t('offset.detect_failed'));
   } finally {
     offsetLoading.value = false;
+  }
+}
+
+// Auto detect offset using AI
+async function autoDetectOffsetAI() {
+  if (!localRule.value.official_title) return;
+  aiOffsetLoading.value = true;
+  aiOffsetResult.value = null;
+  try {
+    const result = await apiBangumi.detectOffsetAI({
+      title: localRule.value.official_title,
+      first_title: null,
+    });
+
+    if (result.has_mismatch && result.suggestion) {
+      localRule.value.season_offset = result.suggestion.season_offset;
+      localRule.value.episode_offset = result.suggestion.episode_offset;
+      aiOffsetResult.value = {
+        season_offset: result.suggestion.season_offset,
+        episode_offset: result.suggestion.episode_offset,
+        reason: result.suggestion.reason,
+        confidence: result.suggestion.confidence,
+      };
+      localRule.value.needs_review = false;
+      localRule.value.needs_review_reason = null;
+      message.success(t('offset.suggestion_applied'));
+    } else if (result.error) {
+      aiOffsetResult.value = {
+        season_offset: 0, episode_offset: 0,
+        reason: result.error,
+        confidence: 'low',
+      };
+      message.warning(result.error);
+    } else {
+      aiOffsetResult.value = {
+        season_offset: 0, episode_offset: 0,
+        reason: t('offset.no_mismatch'),
+        confidence: 'high',
+      };
+      localRule.value.needs_review = false;
+      localRule.value.needs_review_reason = null;
+      message.info(t('offset.no_mismatch'));
+    }
+  } catch (e) {
+    console.error('Failed to detect offset via AI:', e);
+    message.error(t('offset.ai_detect_failed'));
+  } finally {
+    aiOffsetLoading.value = false;
   }
 }
 
@@ -261,6 +311,14 @@ function emitUnarchive() {
           <span v-else>{{ $t('homepage.rule.auto_detect') }}</span>
         </button>
         <button
+          class="detect-btn detect-btn--ai"
+          :disabled="aiOffsetLoading"
+          @click="autoDetectOffsetAI"
+        >
+          <NSpin v-if="aiOffsetLoading" :size="12" />
+          <span v-else>AI {{ $t('homepage.rule.auto_detect') }}</span>
+        </button>
+        <button
           class="dismiss-btn"
           :disabled="dismissingReview"
           @click="dismissReview"
@@ -295,7 +353,35 @@ function emitUnarchive() {
         <bangumi-offset-field
           v-model="localRule.episode_offset"
           :label="$t('homepage.rule.episode_offset')"
-        />
+        >
+          <template #action>
+            <button
+              class="detect-btn"
+              :disabled="offsetLoading"
+              @click="autoDetectOffset"
+            >
+              <NSpin v-if="offsetLoading" :size="14" />
+              <span v-else>{{ $t('homepage.rule.auto_detect') }}</span>
+            </button>
+            <button
+              class="detect-btn detect-btn--ai"
+              :disabled="aiOffsetLoading"
+              @click="autoDetectOffsetAI"
+            >
+              <NSpin v-if="aiOffsetLoading" :size="14" />
+              <span v-else>AI {{ $t('homepage.rule.auto_detect') }}</span>
+            </button>
+          </template>
+        </bangumi-offset-field>
+        <div v-if="offsetReason" class="offset-reason">
+          {{ offsetReason }}
+        </div>
+        <div v-if="aiOffsetResult" class="offset-reason offset-reason--ai">
+          <span class="confidence-badge" :class="`confidence-${aiOffsetResult.confidence}`">
+            {{ aiOffsetResult.confidence }}
+          </span>
+          {{ aiOffsetResult.reason }}
+        </div>
 
         <div class="weekday-row">
           <label class="weekday-label">{{
@@ -575,5 +661,61 @@ function emitUnarchive() {
   margin: 0;
   font-size: 11px;
   color: var(--color-text-secondary);
+}
+
+// AI detect button and result display
+.detect-btn--ai {
+  background: var(--color-secondary, #6366f1);
+
+  &:hover:not(:disabled) {
+    background: var(--color-secondary-hover, #4f46e5);
+  }
+}
+
+.review-warning-actions .detect-btn--ai {
+  background: var(--color-secondary, #6366f1);
+  border: none;
+
+  &:hover:not(:disabled) {
+    background: var(--color-secondary-hover, #4f46e5);
+  }
+}
+
+.offset-reason {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: -4px;
+}
+
+.offset-reason--ai {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.confidence-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 3px;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+.confidence-high {
+  color: #fff;
+  background: var(--color-success, #22c55e);
+}
+
+.confidence-medium {
+  color: #fff;
+  background: var(--color-warning, #eab308);
+}
+
+.confidence-low {
+  color: #fff;
+  background: var(--color-error, #ef4444);
 }
 </style>

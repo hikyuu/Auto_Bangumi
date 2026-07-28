@@ -570,6 +570,7 @@
     "no_mismatch": "No season/episode mismatch detected",
     "review_dismissed": "Review reminder dismissed",
     "detect_failed": "Failed to detect offset",
+    "ai_detect_failed": "AI offset detection failed",
     "dismiss_failed": "Failed to dismiss review"
   },
   "search": {

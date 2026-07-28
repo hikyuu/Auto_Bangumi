@@ -1,3 +1,4 @@
+import logging
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends
@@ -17,6 +18,11 @@ from module.parser.analyser.tmdb_parser import tmdb_parser
 from module.security.api import get_current_user
 
 from .response import u_response
+
+# Late import to avoid circular dependency with ai_offset
+from .ai_offset import AIDetectOffsetRequest, build_ai_offset_message, build_ai_offset_prompt
+
+logger = logging.getLogger(__name__)
 
 
 class OffsetSuggestion(BaseModel):
@@ -40,7 +46,7 @@ class OffsetSuggestionDetail(BaseModel):
     """Detailed offset suggestion from detector."""
 
     season_offset: int
-    episode_offset: int
+    episode_offset: int = 0
     reason: str
     confidence: Literal["high", "medium", "low"]
 
@@ -63,6 +69,26 @@ class DetectOffsetResponse(BaseModel):
     has_mismatch: bool
     suggestion: Optional[OffsetSuggestionDetail]
     tmdb_info: Optional[TMDBSummary]
+
+
+class AIOffsetResult(BaseModel):
+    """Structured output from LLM for AI offset detection."""
+
+    has_mismatch: bool
+    season_offset: int = 0
+    episode_offset: int = 0
+    reason: str = ""
+    confidence: Literal["high", "medium", "low"] = "medium"
+
+
+class AIDetectOffsetResponse(BaseModel):
+    """Response for AI detect-offset endpoint."""
+
+    has_mismatch: bool
+    suggestion: Optional[OffsetSuggestionDetail] = None
+    ai_analysis: Optional[str] = None
+    tmdb_info: Optional[TMDBSummary] = None
+    error: Optional[str] = None
 
 
 router = APIRouter(prefix="/bangumi", tags=["bangumi"])
@@ -345,6 +371,118 @@ async def detect_offset(request: DetectOffsetRequest):
         suggestion=None,
         tmdb_info=tmdb_summary,
     )
+
+
+@router.post(
+    path="/detect-offset/ai",
+    response_model=AIDetectOffsetResponse,
+    dependencies=[Depends(get_current_user)],
+)
+async def detect_offset_ai(request: AIDetectOffsetRequest):
+    """Detect season/episode mismatch using AI/LLM with TMDB data.
+
+    Queries TMDB for series metadata, then uses the configured
+    LLM to analyze the title against TMDB data for potential offsets.
+    """
+    # Check if LLM is enabled
+    llm_config = settings.llm
+    if not llm_config.enable:
+        return AIDetectOffsetResponse(
+            has_mismatch=False,
+            error="AI detection is not enabled",
+        )
+
+    api_key, model, base_url = llm_config.effective("openai")
+    if not api_key:
+        return AIDetectOffsetResponse(
+            has_mismatch=False,
+            error="API key not configured",
+        )
+
+    # Query TMDB
+    language = settings.rss_parser.language
+    tmdb_info = await tmdb_parser(request.title, language)
+
+    if not tmdb_info:
+        return AIDetectOffsetResponse(
+            has_mismatch=False,
+            suggestion=None,
+            tmdb_info=None,
+            error="No TMDB data found for this title",
+        )
+
+    # Build TMDB summary (consistent with auto-detect endpoint)
+    tmdb_summary = TMDBSummary(
+        title=tmdb_info.title,
+        total_seasons=tmdb_info.last_season,
+        season_episode_counts=tmdb_info.season_episode_counts or {},
+        status=tmdb_info.series_status,
+        virtual_season_starts=tmdb_info.virtual_season_starts,
+    )
+
+    # Build prompt with TMDB data
+    prompt = build_ai_offset_prompt()
+    user_message = build_ai_offset_message(request, tmdb_info)
+
+    try:
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(api_key=api_key, base_url=base_url or None)
+
+        resp = await client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": user_message},
+            ],
+            temperature=0,
+            response_format={"type": "json_object"},
+        )
+        content = resp.choices[0].message.content
+
+        if not content:
+            return AIDetectOffsetResponse(
+                has_mismatch=False,
+                tmdb_info=tmdb_summary,
+                error="Empty AI response",
+            )
+
+        import json
+
+        result = json.loads(content[content.index("{") : content.rindex("}") + 1])
+
+        if not isinstance(result, dict):
+            return AIDetectOffsetResponse(
+                has_mismatch=False,
+                tmdb_info=tmdb_summary,
+                error="Failed to parse AI response",
+            )
+
+        ai_result = AIOffsetResult.model_validate(result)
+
+        response = AIDetectOffsetResponse(
+            has_mismatch=ai_result.has_mismatch,
+            ai_analysis=ai_result.reason,
+            tmdb_info=tmdb_summary,
+        )
+
+        if ai_result.has_mismatch:
+            response.suggestion = OffsetSuggestionDetail(
+                season_offset=ai_result.season_offset,
+                episode_offset=ai_result.episode_offset,
+                reason=ai_result.reason,
+                confidence=ai_result.confidence,
+            )
+
+        return response
+
+    except Exception as e:
+        logger.error(f"AI offset detection failed: {e}")
+        return AIDetectOffsetResponse(
+            has_mismatch=False,
+            tmdb_info=tmdb_summary,
+            error=str(e),
+        )
 
 
 @router.post(

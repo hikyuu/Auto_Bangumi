@@ -1,5 +1,7 @@
 import { omit } from 'radash';
 import type {
+  AIDetectOffsetRequest,
+  AIDetectOffsetResponse,
   BangumiAPI,
   BangumiRule,
   DetectOffsetRequest,
@@ -181,6 +183,18 @@ export const apiBangumi = {
   async detectOffset(request: DetectOffsetRequest) {
     const { data } = await axios.post<DetectOffsetResponse>(
       'api/v1/bangumi/detect-offset',
+      request
+    );
+    return data;
+  },
+
+  /**
+   * 使用 AI 检测季度/集数偏移
+   * @param request - 包含标题和首集标题
+   */
+  async detectOffsetAI(request: AIDetectOffsetRequest) {
+    const { data } = await axios.post<AIDetectOffsetResponse>(
+      'api/v1/bangumi/detect-offset/ai',
       request
     );
     return data;

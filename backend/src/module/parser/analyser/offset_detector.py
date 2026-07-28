@@ -78,7 +78,7 @@ def detect_offset_mismatch(
                     f"建议集数偏移+{suggested_episode_offset}）"
                 )
                 logger.debug(
-                    f"Virtual season detected: S{parsed_season} maps to "
+                    f"[OffsetDetector] Virtual season detected: S{parsed_season} maps to "
                     f"TMDB S{target_season} starting at episode {vs_starts[virtual_season_index]}"
                 )
             else:
@@ -95,7 +95,7 @@ def detect_offset_mismatch(
             )
 
         logger.debug(
-            f"Season mismatch: parsed S{parsed_season}, "
+            f"[OffsetDetector] Season mismatch: parsed S{parsed_season}, "
             f"TMDB has {tmdb_info.last_season} seasons, suggesting offset {suggested_season_offset}"
         )
 
@@ -106,20 +106,40 @@ def detect_offset_mismatch(
         adjusted_episode = parsed_episode + (suggested_episode_offset or 0)
 
         if season_ep_count > 0 and adjusted_episode > season_ep_count:
-            # Episode exceeds the count for this season
-            if tmdb_info.series_status == "Returning Series":
-                confidence = "medium"
-                reasons.append(
-                    f"调整后集数{adjusted_episode}超出TMDB该季的{season_ep_count}集"
-                    f"（正在放送中，TMDB可能未更新）"
-                )
+            # Episode exceeds the count for this season — likely absolute numbering
+            # Calculate cumulative offset from previous seasons to convert to relative
+            cumulative_offset = tmdb_info.get_offset_for_season(target_season)
+            if cumulative_offset != 0:
+                suggested_episode_offset = cumulative_offset
+                rel_episode = parsed_episode + cumulative_offset
+                if tmdb_info.series_status == "Returning Series":
+                    confidence = "medium"
+                    reasons.append(
+                        f"检测到绝对集号{parsed_episode}，"
+                        f"已自动转换: S{target_season}E{parsed_episode} → S{target_season}E{rel_episode} "
+                        f"（前{target_season - 1}季累计{abs(cumulative_offset)}集，正在放送中）"
+                    )
+                else:
+                    reasons.append(
+                        f"检测到绝对集号{parsed_episode}，"
+                        f"已自动转换: S{target_season}E{parsed_episode} → S{target_season}E{rel_episode} "
+                        f"（前{target_season - 1}季累计{abs(cumulative_offset)}集）"
+                    )
             else:
-                reasons.append(
-                    f"调整后集数{adjusted_episode}超出TMDB该季的{season_ep_count}集"
-                )
+                # Cannot determine cumulative offset — just flag the issue
+                if tmdb_info.series_status == "Returning Series":
+                    confidence = "medium"
+                    reasons.append(
+                        f"调整后集数{adjusted_episode}超出TMDB该季的{season_ep_count}集"
+                        f"（正在放送中，TMDB可能未更新）"
+                    )
+                else:
+                    reasons.append(
+                        f"调整后集数{adjusted_episode}超出TMDB该季的{season_ep_count}集"
+                    )
 
             logger.debug(
-                f"Episode range issue: adjusted E{adjusted_episode}, "
+                f"[OffsetDetector] Episode range issue: adjusted E{adjusted_episode}, "
                 f"TMDB S{target_season} has {season_ep_count} episodes"
             )
 

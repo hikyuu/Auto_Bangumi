@@ -110,3 +110,18 @@ export interface DetectOffsetResponse {
   suggestion: OffsetSuggestionDetail | null;
   tmdb_info: TMDBSummary | null;
 }
+
+/** Request for AI detect-offset API */
+export interface AIDetectOffsetRequest {
+  title: string;
+  first_title: string | null;
+}
+
+/** Response from AI detect-offset API */
+export interface AIDetectOffsetResponse {
+  has_mismatch: boolean;
+  suggestion: OffsetSuggestionDetail | null;
+  ai_analysis: string | null;
+  tmdb_info: TMDBSummary | null;
+  error: string | null;
+}

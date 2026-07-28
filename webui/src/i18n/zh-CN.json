@@ -570,6 +570,7 @@
     "no_mismatch": "未检测到季度/集数不匹配",
     "review_dismissed": "检查提醒已忽略",
     "detect_failed": "检测偏移量失败",
+    "ai_detect_failed": "AI 检测偏移量失败",
     "dismiss_failed": "忽略检查提醒失败"
   },
   "search": {
